@@ -82,8 +82,8 @@ as
 
 			rollback;
 
-			insert dbo.TransactionLog (SessionNumber, TotalUpdates, TotalInserts)
-			select @SessionNumber, @TotalUpdates, @TotalInserts;
+			--insert dbo.TransactionLog (SessionNumber, TotalUpdates, TotalInserts)
+			--select @SessionNumber, @TotalUpdates, @TotalInserts;
 
 			throw;
 		end catch;
@@ -108,10 +108,10 @@ order by 1;
 		SELECT * FROM [Async].[f_SessionMessage](DEFAULT);
 --*/
 
-select m.SessionNumber, m.RunStatus, m.RunSeconds, l.SessionNumber, l.TotalUpdates, l.TotalInserts
+select l.SessionNumber, m.RunStatus, m.RunSeconds, l.TotalUpdates, l.TotalInserts
 from [Async].[f_SessionMessage](DEFAULT) m
 left join dbo.TransactionLog l on m.SessionNumber = l.SessionNumber
-order by cast(m.SessionNumber as int);
+order by l.SessionNumber;
 
 
 
