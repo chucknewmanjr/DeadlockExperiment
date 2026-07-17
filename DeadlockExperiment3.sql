@@ -82,8 +82,8 @@ as
 
 			rollback;
 
-			--insert dbo.TransactionLog (SessionNumber, TotalUpdates, TotalInserts)
-			--select @SessionNumber, @TotalUpdates, @TotalInserts;
+			insert dbo.TransactionLog (SessionNumber, TotalUpdates, TotalInserts)
+			select @SessionNumber, @TotalUpdates, @TotalInserts;
 
 			throw;
 		end catch;
@@ -95,24 +95,16 @@ go
 
 EXEC [Async].[p_Execute] 100, 'EXEC [Demo].[dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
 
-SELECT m.RunStatus
-	, COUNT(distinct SessionNumber) as SessionCount
-	, avg(m.RunSeconds) as AvgSeconds
-	, iif(message like '%deadlock%', TRY_CAST(value as int), 0) as DeadlockLineNumber
-FROM [Async].[f_SessionMessage](DEFAULT) m
-cross apply string_split(message, '~') v
-group by m.RunStatus, iif(message like '%deadlock%', TRY_CAST(value as int), 0)
-order by 1;
+select RunStatus
+	, LineNumber
+	, COUNT(*) as SessionCount
+	, AVG(RunSeconds) as AvgSeconds
+	, AVG(TotalUpdates + TotalInserts) as AvgTransactions
+from [dbo].[vw_DeadlockReport]
+group by RunStatus, LineNumber;
 
-/*
-		SELECT * FROM [Async].[f_SessionMessage](DEFAULT);
---*/
-
-select l.SessionNumber, m.RunStatus, m.RunSeconds, l.TotalUpdates, l.TotalInserts
-from [Async].[f_SessionMessage](DEFAULT) m
-left join dbo.TransactionLog l on m.SessionNumber = l.SessionNumber
-order by l.SessionNumber;
-
-
+select * 
+from [dbo].[vw_DeadlockReport]
+order by SessionNumber;
 
 
