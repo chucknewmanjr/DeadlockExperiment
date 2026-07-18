@@ -28,58 +28,52 @@ as
 	*/
 	set nocount, xact_abort on;
 
-	declare @RowCount int = 5;
+	declare @RowCount int = 10;
 	declare @Seconds int = 10;
 	declare @Start datetime2(2) = sysdatetime();
 	declare @TotalUpdates int = 0;
 	declare @TotalInserts int = 0;
 
 	create table #Transactions (
-		TransactionCode int
+		TransactionCode int not null
+	);
+
+	create table #Actions (
+		Action varchar(10) not null
 	);
 
 	while DATEDIFF(second, @Start, sysdatetime()) < @Seconds begin; 
 		truncate table #Transactions;
 
+		-- Generate test data.
+		with RecursiveCTE1 as (
+				select 1 as RowNumber
+				union all
+				select RowNumber + 1
+				from RecursiveCTE1
+				where RowNumber < @RowCount
+			)
+		insert #Transactions (TransactionCode)
+		select CHECKSUM(newid()) % 10000 as TransactionCode
+		from RecursiveCTE1
+		OPTION (MAXRECURSION 0);
+
 		begin try;
-			-- Put update and insert in a transaction.
-			begin tran;
 
-			-- Generate test data.
-			with RecursiveCTE1 as (
-					select 1 as RowNumber
-					union all
-					select RowNumber + 1
-					from RecursiveCTE1
-					where RowNumber < @RowCount
-				)
-			insert #Transactions with (tablock) (TransactionCode)
-			select CHECKSUM(newid()) % 10000 as TransactionCode
-			from RecursiveCTE1
-			OPTION (MAXRECURSION 0);
+			merge dbo.Transactions with (xlock) as targt
+			using #Transactions as src
+				on src.TransactionCode = targt.TransactionCode
+			when matched then update set TransactionCode = CHECKSUM(newid()) % 10000
+			when not matched then insert (TransactionCode) values (src.TransactionCode)
+			output $action into #Actions ([Action]);
 
-			update dbo.Transactions with (xlock)
-			set TransactionCode = CHECKSUM(newid()) % 10000
-			from dbo.Transactions targt
-			join #Transactions src on src.TransactionCode = targt.TransactionCode;
+			select @TotalUpdates = sum(iif([Action] = 'UPDATE', 1, 0))
+				, @TotalInserts = sum(iif([Action] = 'INSERT', 1, 0))
+			from #Actions
 
-			set @TotalUpdates += @@rowcount;
-
-			insert dbo.Transactions (TransactionCode)
-			select TransactionCode
-			from #Transactions src
-			except
-			select TransactionCode
-			from dbo.Transactions;
-
-			set @TotalInserts += @@rowcount;
-
-			commit;
 		end try
 		begin catch;
 			print concat('~', error_line(), '~');
-
-			rollback;
 
 			insert dbo.TransactionLog (SessionNumber, TotalUpdates, TotalInserts)
 			select @SessionNumber, @TotalUpdates, @TotalInserts;

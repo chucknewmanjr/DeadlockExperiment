@@ -1,8 +1,8 @@
-use Demo;
+use DeadlockExperiment;
 go
 
 drop table if exists dbo.Transactions;
-drop table if exists dbo.TransactionLog;
+drop table if exists [dbo].[TransactionLog];
 go
 
 create table dbo.Transactions (
@@ -11,21 +11,20 @@ create table dbo.Transactions (
 );
 go
 
-create table dbo.TransactionLog (
-	TransactionLogID int not null identity primary key clustered,
-	CreatedOn datetime2(2) not null default sysdatetime(),
-	SPID int not null default @@SPID,
-	SessionNumber tinyint not null,
+create table [dbo].[TransactionLog] (
+	SessionNumber tinyint not null primary key clustered,
 	TotalUpdates int not null,
-	TotalInserts int not null
+	TotalInserts int not null,
 );
 go
 
-create or alter proc p_PerformTransactions 
+create or alter proc [dbo].[p_PerformTransactions] 
 	@SessionNumber tinyint
 as
 	/*
-		EXEC [dbo].[p_PerformTransactions];
+		truncate table [dbo].[TransactionLog];
+		EXEC [dbo].[p_PerformTransactions] 1;
+		select * from [dbo].[TransactionLog];
 	*/
 	set nocount, xact_abort on;
 
@@ -69,11 +68,9 @@ as
 			insert dbo.Transactions (TransactionCode)
 			select TransactionCode
 			from #Transactions src
-			where not exists (
-					select *
-					from dbo.Transactions targt
-					where targt.TransactionCode = src.TransactionCode
-				);
+			except
+			select TransactionCode
+			from dbo.Transactions;
 
 			set @TotalInserts += @@rowcount;
 
@@ -95,14 +92,15 @@ as
 	select @SessionNumber, @TotalUpdates, @TotalInserts;
 go
 
-EXEC [Async].[p_Execute] 100, 'EXEC [Demo].[dbo].[p_InsertMissingTransactions];', 0;
+EXEC [Async].[p_Execute] 100, 'EXEC [Demo].[dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
 
-select count(*) as DeadlockCount, value as LineNumber
-from msdb.dbo.sysjobhistory h
-cross apply string_split(message, '~')
-where message like '%deadlock%'
-	and TRY_CAST(value as int) is not null
-group by value;
+select RunStatus
+	, LineNumber
+	, COUNT(*) as SessionCount
+	, AVG(RunSeconds) as AvgSeconds
+	, AVG(TotalUpdates + TotalInserts) as AvgTransactions
+from [dbo].[vw_DeadlockReport]
+group by RunStatus, LineNumber;
 
 select * 
 from [dbo].[vw_DeadlockReport]

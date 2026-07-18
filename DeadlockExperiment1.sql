@@ -1,8 +1,8 @@
-use Demo;
+use DeadlockExperiment;
 go
 
 drop table if exists dbo.Transactions;
-drop table if exists dbo.TransactionLog;
+drop table if exists [dbo].[TransactionLog];
 go
 
 create table dbo.Transactions (
@@ -11,21 +11,20 @@ create table dbo.Transactions (
 );
 go
 
-create table dbo.TransactionLog (
-	TransactionLogID int not null identity primary key clustered,
-	CreatedOn datetime2(2) not null default sysdatetime(),
-	SPID int not null default @@SPID,
-	SessionNumber tinyint not null,
+create table [dbo].[TransactionLog] (
+	SessionNumber tinyint not null primary key clustered,
 	TotalUpdates int not null,
-	TotalInserts int not null
+	TotalInserts int not null,
 );
 go
 
-create or alter proc p_PerformTransactions 
+create or alter proc [dbo].[p_PerformTransactions] 
 	@SessionNumber tinyint
 as
 	/*
-		EXEC [dbo].[p_PerformTransactions];
+		truncate table [dbo].[TransactionLog];
+		EXEC [dbo].[p_PerformTransactions] 1;
+		select * from [dbo].[TransactionLog];
 	*/
 	set nocount, xact_abort on;
 
