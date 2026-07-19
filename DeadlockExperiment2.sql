@@ -28,35 +28,36 @@ as
 	*/
 	set nocount, xact_abort on;
 
-	declare @RowCount int = 10;
-	declare @Seconds int = 10;
+	declare @RowCount int = 5;
+	declare @Seconds int = 5;
 	declare @Start datetime2(2) = sysdatetime();
 	declare @TotalUpdates int = 0;
 	declare @TotalInserts int = 0;
 
 	create table #Transactions (
-		TransactionCode int
+		TransactionCode int not null
 	);
 
 	while DATEDIFF(second, @Start, sysdatetime()) < @Seconds begin; 
 		truncate table #Transactions;
 
-		-- Generate test data.
-		with RecursiveCTE1 as (
-				select 1 as RowNumber
-				union all
-				select RowNumber + 1
-				from RecursiveCTE1
-				where RowNumber < @RowCount
-			)
-		insert #Transactions (TransactionCode)
-		select CHECKSUM(newid()) % 10000 as TransactionCode
-		from RecursiveCTE1
-		OPTION (MAXRECURSION 0);
-
 		begin try;
 			-- Put update and insert in a transaction.
 			begin tran;
+
+			-- Generate test data.
+			-- This is inside the transaction so that TABLOCK holds.
+			with RecursiveCTE1 as (
+					select 1 as RowNumber
+					union all
+					select RowNumber + 1
+					from RecursiveCTE1
+					where RowNumber < @RowCount
+				)
+			insert #Transactions with (tablock) (TransactionCode)
+			select CHECKSUM(newid()) % 10000 as TransactionCode
+			from RecursiveCTE1
+			OPTION (MAXRECURSION 0);
 
 			update dbo.Transactions
 			set TransactionCode = CHECKSUM(newid()) % 10000
@@ -92,7 +93,7 @@ as
 	select @SessionNumber, @TotalUpdates, @TotalInserts;
 go
 
-EXEC [Async].[p_Execute] 100, 'EXEC [Demo].[dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
+EXEC [Async].[p_Execute] 100, 'EXEC [dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
 
 select RunStatus
 	, LineNumber

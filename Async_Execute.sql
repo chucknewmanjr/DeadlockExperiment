@@ -123,28 +123,52 @@ as
 	-- Delete these jobs.
 	EXEC [Async].[p_DeleteJobs] @JobNamePrefix = @JobNamePrefix;
 
-	print concat_ws(' - ', sysdatetime(), 'Create and run a job for each session.');
+	declare @DatabaseName sysname = db_name();
+	declare @SessionNumber tinyint;
+	declare @JobName sysname;
+	declare @Command nvarchar(max);
+
+	print concat_ws(' - ', sysdatetime(), 'Create a job for each session.');
 
 	-- Starting at zero is fine since it gets incremented at the top of the loop.
-	declare @SessionNumber tinyint = 0;
+	set @SessionNumber = 0;
 
 	-- Using less-than is fine since ... increment.
 	while @SessionNumber < @SessionCount begin;
 		set @SessionNumber += 1;
 
 		-- Each job gets its own name.
-		declare @JobName sysname = concat(@JobNamePrefix, @SessionNumber);
+		set @JobName = concat(@JobNamePrefix, @SessionNumber);
 
-		declare @Command nvarchar(max) = replace(@CommandText, '[SessionNumber]', @SessionNumber);
+		-- The command might have the [SessionNumber] placeholder in it.
+		set @Command = replace(@CommandText, '[SessionNumber]', @SessionNumber);
 
 		-- create the job.
-		EXEC msdb.dbo.sp_add_job @job_name = @JobName;
+		EXEC msdb.dbo.sp_add_job 
+			@job_name = @JobName;
 
 		-- Put SQL commands into a single step inside of that job.
-		EXEC msdb.dbo.sp_add_jobstep @job_name = @JobName, @step_name = N'Single Job Step', @Command = @Command;
+		EXEC msdb.dbo.sp_add_jobstep 
+			@job_name = @JobName, 
+			@step_name = N'Single Job Step', 
+			@Command = @Command, 
+			@database_name = @DatabaseName;
 
 		-- Creating a job does not set the target server to the obvious choice.
-		EXEC msdb.dbo.sp_add_jobserver @job_name = @JobName, @server_name = N'(local)';
+		EXEC msdb.dbo.sp_add_jobserver 
+			@job_name = @JobName, 
+			@server_name = N'(local)';
+	end; -- End while @SessionNumber <= @SessionCount
+
+	-- Jobs are started in a separate loop so that they start closer together.
+	print concat_ws(' - ', sysdatetime(), 'Run the job for each session.');
+
+	set @SessionNumber = 0;
+
+	while @SessionNumber < @SessionCount begin;
+		set @SessionNumber += 1;
+
+		set @JobName = concat(@JobNamePrefix, @SessionNumber);
 
 		-- Start it asychronusly.
 		EXEC msdb.dbo.sp_start_job @job_name = @JobName;
@@ -166,7 +190,7 @@ as
 	-- Delete the jobs maybe.
 	if @CleanUpFlag = 1 EXEC [Async].[p_DeleteJobs] @JobNamePrefix = @JobNamePrefix;
 
-	print 'All done.';
+	print concat_ws(' - ', sysdatetime(), 'All done.');
 go
 
 

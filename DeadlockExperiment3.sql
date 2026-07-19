@@ -29,13 +29,13 @@ as
 	set nocount, xact_abort on;
 
 	declare @RowCount int = 5;
-	declare @Seconds int = 10;
+	declare @Seconds int = 5;
 	declare @Start datetime2(2) = sysdatetime();
 	declare @TotalUpdates int = 0;
 	declare @TotalInserts int = 0;
 
 	create table #Transactions (
-		TransactionCode int
+		TransactionCode int not null
 	);
 
 	while DATEDIFF(second, @Start, sysdatetime()) < @Seconds begin; 
@@ -46,6 +46,7 @@ as
 			begin tran;
 
 			-- Generate test data.
+			-- This is inside the transaction so that TABLOCK holds.
 			with RecursiveCTE1 as (
 					select 1 as RowNumber
 					union all

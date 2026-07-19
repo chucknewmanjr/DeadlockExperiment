@@ -35,7 +35,7 @@ as
 	declare @TotalInserts int = 0;
 
 	create table #Transactions (
-		TransactionCode int
+		TransactionCode int not null
 	);
 
 	while DATEDIFF(second, @Start, sysdatetime()) < @Seconds begin; 
@@ -94,7 +94,7 @@ as
 	select @SessionNumber, @TotalUpdates, @TotalInserts;
 go
 
-EXEC [Async].[p_Execute] 100, 'EXEC [Demo].[dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
+EXEC [Async].[p_Execute] 100, 'EXEC [dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
 
 select RunStatus
 	, LineNumber

@@ -44,6 +44,7 @@ as
 
 	while DATEDIFF(second, @Start, sysdatetime()) < @Seconds begin; 
 		truncate table #Transactions;
+		truncate table #Actions;
 
 		-- Generate test data.
 		with RecursiveCTE1 as (
@@ -61,16 +62,15 @@ as
 		begin try;
 
 			merge dbo.Transactions with (xlock) as targt
-			using #Transactions as src
+			using (select distinct TransactionCode from #Transactions) as src
 				on src.TransactionCode = targt.TransactionCode
 			when matched then update set TransactionCode = CHECKSUM(newid()) % 10000
 			when not matched then insert (TransactionCode) values (src.TransactionCode)
 			output $action into #Actions ([Action]);
 
-			select @TotalUpdates = sum(iif([Action] = 'UPDATE', 1, 0))
-				, @TotalInserts = sum(iif([Action] = 'INSERT', 1, 0))
-			from #Actions
-
+			select @TotalUpdates += sum(iif([Action] = 'UPDATE', 1, 0))
+				, @TotalInserts += sum(iif([Action] = 'INSERT', 1, 0))
+			from #Actions;
 		end try
 		begin catch;
 			print concat('~', error_line(), '~');
@@ -86,7 +86,7 @@ as
 	select @SessionNumber, @TotalUpdates, @TotalInserts;
 go
 
-EXEC [Async].[p_Execute] 100, 'EXEC [Demo].[dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
+EXEC [Async].[p_Execute] 100, 'EXEC [dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
 
 select RunStatus
 	, LineNumber
