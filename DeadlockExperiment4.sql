@@ -28,8 +28,8 @@ as
 	*/
 	set nocount, xact_abort on;
 
-	declare @RowCount int = 10;
-	declare @Seconds int = 10;
+	declare @RowCount int = 5;
+	declare @Seconds int = 5;
 	declare @Start datetime2(2) = sysdatetime();
 	declare @TotalUpdates int = 0;
 	declare @TotalInserts int = 0;
@@ -56,8 +56,7 @@ as
 			)
 		insert #Transactions (TransactionCode)
 		select CHECKSUM(newid()) % 10000 as TransactionCode
-		from RecursiveCTE1
-		OPTION (MAXRECURSION 0);
+		from RecursiveCTE1;
 
 		begin try;
 
