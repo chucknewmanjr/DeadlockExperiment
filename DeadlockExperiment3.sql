@@ -56,8 +56,7 @@ as
 				)
 			insert #Transactions with (tablock) (TransactionCode)
 			select CHECKSUM(newid()) % 10000 as TransactionCode
-			from RecursiveCTE1
-			OPTION (MAXRECURSION 0);
+			from RecursiveCTE1;
 
 			update dbo.Transactions with (xlock)
 			set TransactionCode = CHECKSUM(newid()) % 10000
