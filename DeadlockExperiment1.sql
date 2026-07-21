@@ -51,8 +51,7 @@ as
 			)
 		insert #Transactions (TransactionCode)
 		select CHECKSUM(newid()) % 10000 as TransactionCode
-		from RecursiveCTE1
-		OPTION (MAXRECURSION 0);
+		from RecursiveCTE1;
 
 		begin try;
 			-- Put update and insert in a transaction.
