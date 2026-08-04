@@ -1,3 +1,6 @@
+use DeadlockExperiment;
+go
+
 create or alter view [dbo].[vw_DeadlockReport] as
 	with ErrorLines as (
 		select m.SessionNumber, v.value as LineNumber

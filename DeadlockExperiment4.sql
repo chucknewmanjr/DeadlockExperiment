@@ -85,7 +85,9 @@ as
 	select @SessionNumber, @TotalUpdates, @TotalInserts;
 go
 
-EXEC [Async].[p_Execute] 100, 'EXEC [dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';', 0;
+EXEC [Async].[p_Execute] 100, 'EXEC [dbo].[p_PerformTransactions] @SessionNumber = ''[SessionNumber]'';';
+
+exec [Async].[p_Wait];
 
 select RunStatus
 	, LineNumber
